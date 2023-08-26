@@ -66,6 +66,12 @@ public class BluetoothDeviceListAdapter extends ListAdapter<BluetoothDevice, Blu
         this.notifyItemChanged(devices.size() - 1);
     }
 
+    public void clear() {
+        final int deviceCount = devices.size();
+        this.devices.clear();
+        this.notifyItemRangeRemoved(0, deviceCount);
+    }
+
     static class BluetoothDeviceViewHolder extends RecyclerView.ViewHolder {
 
         private final Context context;

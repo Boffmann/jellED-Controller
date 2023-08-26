@@ -13,10 +13,8 @@ import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
-import android.location.LocationRequest;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -31,6 +29,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.location.LocationManagerCompat;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.jelled.controller.Alert.AlertDialogFactory;
 
@@ -51,6 +50,8 @@ public class DeviceScanActivity extends AppCompatActivity {
     private final ScheduledExecutorService scanningScheduler = new ScheduledThreadPoolExecutor(1);
 
     private ActivityResultLauncher<Intent> bluetoothActivationResultLauncher;
+
+    private SwipeRefreshLayout swipeRefreshLayout;
 
     private boolean scanning;
 
@@ -79,8 +80,6 @@ public class DeviceScanActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Todo Error handling in case of crash/exception
-
         if (!isBluetoothSupported()) {
             AlertDialogFactory.newDefaultBuilder(this, AlertDialogFactory.DialogType.ERROR,
                     "Bluetooth is not supported by this device")
@@ -103,6 +102,12 @@ public class DeviceScanActivity extends AppCompatActivity {
         );
 
         setContentView(R.layout.activity_device_scan);
+
+        swipeRefreshLayout = findViewById(R.id.bluetooth_swipe_refresh_view);
+        swipeRefreshLayout.setOnRefreshListener( () -> {
+            deviceListAdapter.clear();
+            scanLeDevices();
+        });
 
         RecyclerView recyclerView = findViewById(R.id.bluetooth_devices_view);
         recyclerView.setAdapter(deviceListAdapter);
@@ -207,12 +212,14 @@ public class DeviceScanActivity extends AppCompatActivity {
             scanningScheduler.schedule(() -> {
                 scanning = false;
                 bluetoothScanner.stopScan(scanCallback);
+                swipeRefreshLayout.setRefreshing(false);
             }, SCAN_PERIOD, TimeUnit.SECONDS);
             scanning = true;
             bluetoothScanner.startScan(scanCallback);
         } else {
             scanning = false;
             bluetoothScanner.stopScan(scanCallback);
+            swipeRefreshLayout.setRefreshing(false);
         }
     }
 }
