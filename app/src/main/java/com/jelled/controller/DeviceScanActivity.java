@@ -11,10 +11,15 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.content.pm.PackageManager;
+import android.location.LocationManager;
+import android.location.LocationRequest;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.Log;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -23,6 +28,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.location.LocationManagerCompat;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -53,12 +59,6 @@ public class DeviceScanActivity extends AppCompatActivity {
         public void onScanResult(int callbackType, ScanResult result) {
             super.onScanResult(callbackType, result);
             deviceListAdapter.addDevice(result.getDevice());
-        }
-
-        @Override
-        public void onScanFailed (int errorCode) {
-            super.onScanFailed(errorCode);
-            // TODO
         }
     };
 
@@ -95,16 +95,12 @@ public class DeviceScanActivity extends AppCompatActivity {
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
                     if (result.getResultCode() != Activity.RESULT_OK) {
-                        failWithBluetoothNotEnabled();
+                        failWithMessage("Bluetooth is not activated");
                     } else {
                         scanLeDevices();
                     }
                 }
         );
-
-        if (!isBluetoothEnabled()) {
-            enableBluetooth();
-        }
 
         setContentView(R.layout.activity_device_scan);
 
@@ -132,11 +128,11 @@ public class DeviceScanActivity extends AppCompatActivity {
         }
     }
 
-    private void failWithBluetoothNotEnabled() {
+    private void failWithMessage(final String message) {
         AlertDialogFactory.newDefaultBuilder(this, AlertDialogFactory.DialogType.ERROR,
-                "Bluetooth is not activated")
+                message)
                 .setPositiveButton("OK", (dialog, id) -> {
-                    throw new RuntimeException("Bluetooth is not activated");
+                    throw new RuntimeException(message);
                 })
                 .create()
                 .show();
@@ -155,6 +151,17 @@ public class DeviceScanActivity extends AppCompatActivity {
         bluetoothActivationResultLauncher.launch(enableBtIntent);
     }
 
+    private boolean isLocationEnabled() {
+        LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+        return LocationManagerCompat.isLocationEnabled(locationManager);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.S)
+    private void enableLocationSettings() {
+        Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+        startActivity(intent);
+    }
+
     private boolean checkAndRequestPermission(final String permission) {
         if (ActivityCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{permission},
@@ -166,6 +173,14 @@ public class DeviceScanActivity extends AppCompatActivity {
 
     @RequiresApi(api = Build.VERSION_CODES.S)
     private void scanLeDevices() {
+        if (!isBluetoothEnabled()) {
+            enableBluetooth();
+        }
+
+        if (!isLocationEnabled()) {
+            enableLocationSettings();
+        }
+
         if (bluetoothScanner == null) {
             // Bluetooth scanner might be null because of different reasons. For example because
             // bluetooth was not activated once the activity was created
