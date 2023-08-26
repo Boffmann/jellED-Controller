@@ -82,12 +82,11 @@ public class BluetoothDeviceListAdapter extends ListAdapter<BluetoothDevice, Blu
                 final String log = String.format("Device Name: %s Device Address: %s", deviceNameView.getText(), deviceAddressView.getText());
                 Log.i(TAG, "On click " + log);
             });
-            //deviceTextView.setOnClickListener();
         }
 
         public void bind(final BluetoothDevice device) {
             if (ActivityCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                AlertDialogFactory.createOkDialog(context, AlertDialogFactory.DialogType.ERROR, "Cannot show name of device. Permission not granted.");
+                AlertDialogFactory.createInfoDialog(context, AlertDialogFactory.DialogType.ERROR, "Cannot show name of device. Permission not granted.").show();
                 return;
             }
             this.deviceNameView.setText(String.format(DEVICE_NAME_TEMPLATE, device.getName()));
