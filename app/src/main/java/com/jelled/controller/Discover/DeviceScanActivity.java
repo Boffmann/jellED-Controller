@@ -1,4 +1,4 @@
-package com.jelled.controller;
+package com.jelled.controller.Discover;
 
 import static android.Manifest.permission.ACCESS_COARSE_LOCATION;
 import static android.Manifest.permission.ACCESS_FINE_LOCATION;
@@ -10,13 +10,16 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Parcel;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -32,16 +35,24 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.jelled.controller.Alert.AlertDialogFactory;
+import com.jelled.controller.Control.JellEDControlActivity;
+import com.jelled.controller.R;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public class DeviceScanActivity extends AppCompatActivity {
 
     private static final String TAG = "DeviceScanActivity";
+    private static final String JELLED_DEVICE_NAME = "jellED";
     private static final int BLUETOOTH_PERMISSION_REQUEST_CODE = 1;
+
+    private static final boolean AUTO_CONNECT = true;
 
     private static final long SCAN_PERIOD = 2;
 
@@ -54,6 +65,15 @@ public class DeviceScanActivity extends AppCompatActivity {
     private SwipeRefreshLayout swipeRefreshLayout;
 
     private boolean scanning;
+
+    private final ScanFilter scanFilter = new ScanFilter.Builder()
+            .setDeviceName(JELLED_DEVICE_NAME)
+            .build();
+
+    private final ScanSettings scanSettings = new ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
+            .build();
 
     private final ScanCallback scanCallback = new ScanCallback() {
         @Override
@@ -73,7 +93,14 @@ public class DeviceScanActivity extends AppCompatActivity {
         public boolean areContentsTheSame(@NonNull BluetoothDevice oldItem, @NonNull BluetoothDevice newItem) {
             return oldItem.equals(newItem);
         }
-    });
+    }, new BiConsumer<Context, BluetoothDevice>() {
+        @Override
+        public void accept(Context context, BluetoothDevice bluetoothDevice) {
+            Intent controlActivityIntent = new Intent(context, JellEDControlActivity.class);
+            controlActivityIntent.putExtra(JellEDControlActivity.EXTRAS_BLUETOOTH_DEVICE, bluetoothDevice);
+            context.startActivity(controlActivityIntent);
+        }
+    } );
 
     @RequiresApi(api = Build.VERSION_CODES.S)
     @Override
@@ -215,7 +242,7 @@ public class DeviceScanActivity extends AppCompatActivity {
                 swipeRefreshLayout.setRefreshing(false);
             }, SCAN_PERIOD, TimeUnit.SECONDS);
             scanning = true;
-            bluetoothScanner.startScan(scanCallback);
+            bluetoothScanner.startScan(List.of(scanFilter), scanSettings, scanCallback);
         } else {
             scanning = false;
             bluetoothScanner.stopScan(scanCallback);

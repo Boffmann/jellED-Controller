@@ -34,14 +34,30 @@
                 android:padding="10dp"
                 android:textSize="18sp"
                 android:textStyle="bold" />
-            <TextView
-                android:id="@+id/device_address_view"
-                android:layout_width="wrap_content"
+            <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="bottom|center_horizontal"
-                android:padding="10dp"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                xmlns:app="http://schemas.android.com/apk/res-auto">
+
+                <TextView
+                    android:id="@+id/device_address_title_view"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|center_horizontal"
+                    android:padding="10dp"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/device_address_view"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|center_horizontal"
+                    android:layout_toRightOf="@+id/device_address_title_view"
+                    android:padding="10dp"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+            </RelativeLayout>
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 </RelativeLayout>

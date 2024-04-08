@@ -1,7 +1,8 @@
-package com.jelled.controller;
+package com.jelled.controller.Discover;
 
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -16,22 +17,33 @@ import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.jelled.controller.Alert.AlertDialogFactory;
+import com.jelled.controller.Control.JellEDControlActivity;
+import com.jelled.controller.R;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
-public class BluetoothDeviceListAdapter extends ListAdapter<BluetoothDevice, BluetoothDeviceListAdapter.BluetoothDeviceViewHolder> {
+class BluetoothDeviceListAdapter extends ListAdapter<BluetoothDevice, BluetoothDeviceListAdapter.BluetoothDeviceViewHolder> {
 
     private static final String TAG = "BluetoothDeviceListAdapter";
     private static final String DEVICE_NAME_TEMPLATE = "Name: %s";
-    private static final String DEVICE_ADDRESS_TEMPLATE = "Address: %s";
+    private static final String DEVICE_ADDRESS_TITLE = "Address: ";
 
     private final Context context;
     private final List<BluetoothDevice> devices;
 
-    protected BluetoothDeviceListAdapter(final Context context, @NonNull DiffUtil.ItemCallback<BluetoothDevice> diffCallback) {
+    private final BiConsumer<Context, BluetoothDevice> onConnectConsumer;
+
+    protected BluetoothDeviceListAdapter(final Context context,
+         @NonNull DiffUtil.ItemCallback<BluetoothDevice> diffCallback,
+         final BiConsumer<Context, BluetoothDevice> onConnectConsumer) {
         super(diffCallback);
         this.context = context;
+        this.onConnectConsumer = onConnectConsumer;
         devices = new ArrayList<>();
     }
 
@@ -58,7 +70,7 @@ public class BluetoothDeviceListAdapter extends ListAdapter<BluetoothDevice, Blu
         return devices.size();
     }
 
-    public void addDevice(final BluetoothDevice device) {
+    void addDevice(final BluetoothDevice device) {
         if (this.devices.contains(device)) {
             return;
         }
@@ -66,27 +78,32 @@ public class BluetoothDeviceListAdapter extends ListAdapter<BluetoothDevice, Blu
         this.notifyItemChanged(devices.size() - 1);
     }
 
-    public void clear() {
+    void clear() {
         final int deviceCount = devices.size();
         this.devices.clear();
         this.notifyItemRangeRemoved(0, deviceCount);
     }
 
-    static class BluetoothDeviceViewHolder extends RecyclerView.ViewHolder {
+    class BluetoothDeviceViewHolder extends RecyclerView.ViewHolder {
 
         private final Context context;
         private final TextView deviceNameView;
+        private final TextView deviceAddressTitleView;
         private final TextView deviceAddressView;
+        private final Map<String, BluetoothDevice> devices;
 
         public BluetoothDeviceViewHolder(@NonNull final Context context, @NonNull final View itemView) {
             super(itemView);
             this.context = context;
+            devices = new HashMap<>();
             this.deviceNameView = itemView.findViewById(R.id.device_name_view);
+            this.deviceAddressTitleView = itemView.findViewById(R.id.device_address_title_view);
             this.deviceAddressView = itemView.findViewById(R.id.device_address_view);
 
             itemView.setOnClickListener(view -> {
                 final String log = String.format("Device Name: %s Device Address: %s", deviceNameView.getText(), deviceAddressView.getText());
                 Log.i(TAG, "On click " + log);
+                onConnectConsumer.accept(context, devices.get(deviceAddressView.getText().toString()));
             });
         }
 
@@ -95,8 +112,10 @@ public class BluetoothDeviceListAdapter extends ListAdapter<BluetoothDevice, Blu
                 AlertDialogFactory.createInfoDialog(context, AlertDialogFactory.DialogType.ERROR, "Cannot show name of device. Permission not granted.").show();
                 return;
             }
+            this.devices.put(device.getAddress(), device);
             this.deviceNameView.setText(String.format(DEVICE_NAME_TEMPLATE, device.getName()));
-            this.deviceAddressView.setText(String.format(DEVICE_ADDRESS_TEMPLATE, device.getAddress()));
+            this.deviceAddressTitleView.setText(String.format(DEVICE_ADDRESS_TITLE, device.getAddress()));
+            this.deviceAddressView.setText(device.getAddress());
         }
     }
 }
