@@ -8,7 +8,7 @@ android {
 
     defaultConfig {
         applicationId = "com.jelled.controller"
-        minSdk = 29
+        minSdk = 33
         targetSdk = 33
         versionCode = 1
         versionName = "1.0"

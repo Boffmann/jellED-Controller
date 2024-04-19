@@ -3,7 +3,9 @@ package com.jelled.controller.Control;
 import static android.Manifest.permission.BLUETOOTH_CONNECT;
 import static android.bluetooth.BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION;
 import static android.bluetooth.BluetoothGatt.GATT_INSUFFICIENT_ENCRYPTION;
+import static android.bluetooth.BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH;
 import static android.bluetooth.BluetoothGatt.GATT_SUCCESS;
+import static android.bluetooth.BluetoothGatt.GATT_WRITE_NOT_PERMITTED;
 import static android.bluetooth.BluetoothGattCharacteristic.PROPERTY_WRITE;
 
 import android.app.Service;
@@ -12,7 +14,6 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
 import android.content.Intent;
@@ -20,15 +21,13 @@ import android.content.pm.PackageManager;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 
-import com.jelled.controller.Alert.AlertDialogFactory;
-
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -48,6 +47,8 @@ public class BluetoothLeService extends Service {
     private BluetoothDevice bluetoothDevice;
 
     private BluetoothGatt bluetoothGatt = null;
+
+    private BluetoothGattCharacteristic writeCharacteristic;
 
     private int connectionState;
 
@@ -81,9 +82,23 @@ public class BluetoothLeService extends Service {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             if (status == GATT_SUCCESS) {
                 Log.i(TAG, "onServicesDiscovered received success " + status);
-                printGattTable();
+                discoverWriteCharacteristic();
             } else {
                 Log.w(TAG, "onServicesDiscovered received " + status);
+            }
+        }
+
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            byte[] value = characteristic.getValue();
+            if (status == GATT_SUCCESS) {
+                Log.i(TAG, "Successfully wrote to characteristic " + Arrays.toString(value));
+            } else if (status == GATT_INVALID_ATTRIBUTE_LENGTH) {
+                Log.e(TAG, "Write exceeded connection ATT MTU");
+            } else if (status == GATT_WRITE_NOT_PERMITTED) {
+                Log.e(TAG, "Write to characteristic not permitted");
+            } else {
+                Log.e(TAG, "Write failed with error: " + status);
             }
         }
     };
@@ -125,7 +140,14 @@ public class BluetoothLeService extends Service {
         if (this.connectionState != STATE_CONNECTED) {
             connect();
         }
-        // TODO Write Data
+        // TODO Schedule write data
+    }
+
+    private void writeToCharacteristic(final int data) throws SecurityException {
+        bluetoothGatt.writeCharacteristic(
+                writeCharacteristic,
+                "Test".getBytes(),
+                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
     }
 
     private boolean connect() throws SecurityException {
@@ -145,7 +167,7 @@ public class BluetoothLeService extends Service {
         }
     }
 
-    private void printGattTable() {
+    private void discoverWriteCharacteristic() {
         if (bluetoothGatt.getServices().isEmpty()) {
             Log.e(TAG, "No Service and Characteristics available.");
             return;
@@ -157,6 +179,10 @@ public class BluetoothLeService extends Service {
                         Log.i(TAG, "Found Characteristic " + characteristic.getUuid().toString());
                         if ((characteristic.getProperties() & PROPERTY_WRITE) == 0) {
                             throw new RuntimeException("Error: Characteristic is supposed to be writable");
+                        } else {
+                            this.writeCharacteristic = characteristic;
+                            writeToCharacteristic(1);
+                            return;
                         }
                     }
                 }
