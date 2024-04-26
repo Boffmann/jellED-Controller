@@ -8,6 +8,7 @@ import static android.Manifest.permission.BLUETOOTH_SCAN;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
@@ -17,16 +18,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Parcel;
 import android.provider.Settings;
 import android.util.Log;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.location.LocationManagerCompat;
@@ -44,7 +42,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 public class DeviceScanActivity extends AppCompatActivity {
 
@@ -52,12 +49,10 @@ public class DeviceScanActivity extends AppCompatActivity {
     private static final String JELLED_DEVICE_NAME = "jellED";
     private static final int BLUETOOTH_PERMISSION_REQUEST_CODE = 1;
 
-    private static final boolean AUTO_CONNECT = true;
-
     private static final long SCAN_PERIOD = 2;
 
-    private final BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-    private BluetoothLeScanner bluetoothScanner = bluetoothAdapter.getBluetoothLeScanner();
+    private BluetoothAdapter bluetoothAdapter;
+    private BluetoothLeScanner bluetoothScanner;
     private final ScheduledExecutorService scanningScheduler = new ScheduledThreadPoolExecutor(1);
 
     private ActivityResultLauncher<Intent> bluetoothActivationResultLauncher;
@@ -102,10 +97,12 @@ public class DeviceScanActivity extends AppCompatActivity {
         }
     } );
 
-    @RequiresApi(api = Build.VERSION_CODES.S)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        bluetoothAdapter = ((BluetoothManager) this.getSystemService(Context.BLUETOOTH_SERVICE)).getAdapter();
+        bluetoothScanner = bluetoothAdapter.getBluetoothLeScanner();
 
         if (!isBluetoothSupported()) {
             AlertDialogFactory.newDefaultBuilder(this, AlertDialogFactory.DialogType.ERROR,
@@ -146,7 +143,6 @@ public class DeviceScanActivity extends AppCompatActivity {
         This method is called back after permission request in checkAndRequestPermission
         was answered.
      */
-    @RequiresApi(api = Build.VERSION_CODES.S)
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                     @NonNull int[] grantResults) {
@@ -188,7 +184,6 @@ public class DeviceScanActivity extends AppCompatActivity {
         return LocationManagerCompat.isLocationEnabled(locationManager);
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.S)
     private void enableLocationSettings() {
         Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
         startActivity(intent);
@@ -203,7 +198,6 @@ public class DeviceScanActivity extends AppCompatActivity {
         return true;
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.S)
     private void scanLeDevices() {
         if (!isBluetoothEnabled()) {
             enableBluetooth();

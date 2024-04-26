@@ -27,6 +27,8 @@ public class JellEDControlActivity extends AppCompatActivity {
 
     private BluetoothDevice bluetoothDevice;
 
+    static int data = 0;
+
     private final ServiceConnection serviceconnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder binder) {
@@ -58,7 +60,7 @@ public class JellEDControlActivity extends AppCompatActivity {
         onOffButton = findViewById(R.id.on_off_button);
 
         onOffButton.setOnClickListener(view -> {
-            bluetoothService.writePackage(1);
+            bluetoothService.writePackage(new BluetoothPayload("" + data++));
         });
 
         final Intent gattServiceIntent = new Intent(this, BluetoothLeService.class);
@@ -68,10 +70,6 @@ public class JellEDControlActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-
-//        if (bluetoothService != null) {
-//            final boolean result = bluetoothService.connect(bluetoothDevice);
-//        }
     }
 
     @Override

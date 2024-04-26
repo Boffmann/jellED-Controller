@@ -140,6 +140,8 @@ public class BluetoothLeService extends Service {
     void initialize(final BluetoothDevice bluetoothDevice) {
         this.bluetoothDevice = bluetoothDevice;
 
+        connect();
+
         ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
         executorService.scheduleAtFixedRate(() -> {
             final BleOperation bleOperation = commandQueue.getNextOperation();
@@ -153,14 +155,14 @@ public class BluetoothLeService extends Service {
         }, 1, 1, TimeUnit.SECONDS);
     }
 
-    void writePackage(final int data) throws SecurityException {
+    void writePackage(final BluetoothPayload payload) throws SecurityException {
         if (connectionState != STATE_CONNECTED || this.bluetoothGatt == null || this.writeCharacteristic == null) {
             Log.e(TAG, "error: Not connected, cannot schedule write operation. " +
             "Will schedule connect instead.");
             connect();
             return;
         }
-        this.commandQueue.scheduleOperation(new BleWriteOperation(bluetoothDevice, bluetoothGatt, writeCharacteristic));
+        this.commandQueue.scheduleOperation(new BleWriteOperation(bluetoothDevice, bluetoothGatt, writeCharacteristic, payload));
     }
 
     private void connect() throws SecurityException {
