@@ -15,21 +15,30 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
+import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Binder;
-import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
+
+import com.jelled.controller.Control.Operation.BleConnectOperation;
+import com.jelled.controller.Control.Operation.BleOperation;
+import com.jelled.controller.Control.Operation.BleWriteOperation;
+import com.jelled.controller.Exception.JellEDBluetoothException;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class BluetoothLeService extends Service {
 
@@ -43,17 +52,17 @@ public class BluetoothLeService extends Service {
 
     private final Binder binder = new LocalBinder();
 
-    private BluetoothAdapter bluetoothAdapter;
     private BluetoothDevice bluetoothDevice;
 
     private BluetoothGatt bluetoothGatt = null;
 
     private BluetoothGattCharacteristic writeCharacteristic;
 
+    private final CommandQueue commandQueue = new CommandQueue();
+
     private int connectionState;
 
     private final BluetoothGattCallback bluetoothGattCallback = new BluetoothGattCallback() {
-        @RequiresApi(api = Build.VERSION_CODES.S)
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) throws SecurityException {
             if (status != GATT_SUCCESS) {
@@ -68,6 +77,7 @@ public class BluetoothLeService extends Service {
                 return;
             }
 
+            bluetoothGatt = gatt;
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 connectionState = STATE_CONNECTED;
                 // TODO Call on Main/UI Thread?
@@ -76,6 +86,7 @@ public class BluetoothLeService extends Service {
                 connectionState = STATE_DISCONNECTED;
                 gatt.close();
             }
+            commandQueue.signalOperationCompleted();
         }
 
         @Override
@@ -100,6 +111,7 @@ public class BluetoothLeService extends Service {
             } else {
                 Log.e(TAG, "Write failed with error: " + status);
             }
+            commandQueue.signalOperationCompleted();
         }
     };
 
@@ -109,14 +121,12 @@ public class BluetoothLeService extends Service {
         return binder;
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.S)
     @Override
     public boolean onUnbind(Intent intent) {
         close();
         return super.onUnbind(intent);
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.S)
     private void close() {
         if (bluetoothGatt == null) {
             return;
@@ -128,43 +138,33 @@ public class BluetoothLeService extends Service {
     }
 
     void initialize(final BluetoothDevice bluetoothDevice) {
-        bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (bluetoothAdapter == null) {
-            Log.e(TAG, "Unable to obtain a BluetoothAdapter.");
-            return;
-        }
         this.bluetoothDevice = bluetoothDevice;
+
+        ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+        executorService.scheduleAtFixedRate(() -> {
+            final BleOperation bleOperation = commandQueue.getNextOperation();
+            if (bleOperation != null) {
+                try {
+                    bleOperation.execute();
+                } catch (JellEDBluetoothException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }, 1, 1, TimeUnit.SECONDS);
     }
 
     void writePackage(final int data) throws SecurityException {
-        if (this.connectionState != STATE_CONNECTED) {
+        if (connectionState != STATE_CONNECTED || this.bluetoothGatt == null || this.writeCharacteristic == null) {
+            Log.e(TAG, "error: Not connected, cannot schedule write operation. " +
+            "Will schedule connect instead.");
             connect();
+            return;
         }
-        // TODO Schedule write data
+        this.commandQueue.scheduleOperation(new BleWriteOperation(bluetoothDevice, bluetoothGatt, writeCharacteristic));
     }
 
-    private void writeToCharacteristic(final int data) throws SecurityException {
-        bluetoothGatt.writeCharacteristic(
-                writeCharacteristic,
-                "Test".getBytes(),
-                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
-    }
-
-    private boolean connect() throws SecurityException {
-        if (bluetoothAdapter == null || bluetoothDevice == null) {
-            Log.w(TAG, "BluetoothAdapter not initialized or unspecified bluetoothDevice.");
-            return false;
-        }
-
-//        Log.i(TAG, "Got address: " + address);
-//        final BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
-        try {
-            bluetoothGatt = bluetoothDevice.connectGatt(this, false, bluetoothGattCallback, BluetoothDevice.TRANSPORT_LE);
-            return true;
-        } catch (final IllegalArgumentException exception) {
-            Log.w(TAG, "Device not found with provided address " + bluetoothDevice.getAddress());
-            return false;
-        }
+    private void connect() throws SecurityException {
+        this.commandQueue.scheduleOperation(new BleConnectOperation(bluetoothDevice, this, bluetoothGattCallback));
     }
 
     private void discoverWriteCharacteristic() {
@@ -181,7 +181,6 @@ public class BluetoothLeService extends Service {
                             throw new RuntimeException("Error: Characteristic is supposed to be writable");
                         } else {
                             this.writeCharacteristic = characteristic;
-                            writeToCharacteristic(1);
                             return;
                         }
                     }
@@ -190,22 +189,41 @@ public class BluetoothLeService extends Service {
         }
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.S)
     private boolean checkPermission() {
         return ActivityCompat.checkSelfPermission(this, BLUETOOTH_CONNECT) ==
                 PackageManager.PERMISSION_GRANTED;
     }
 
-    public List<BluetoothGattService> getSupportedGattServices() {
-        if (bluetoothGatt == null) {
-            return null;
-        }
-        return bluetoothGatt.getServices();
-    }
-
     class LocalBinder extends Binder {
         public BluetoothLeService getService() {
             return BluetoothLeService.this;
+        }
+    }
+
+    private static class CommandQueue {
+        private final ConcurrentLinkedQueue<BleOperation> fifo;
+        private boolean isOperationPending;
+
+        CommandQueue() {
+            fifo = new ConcurrentLinkedQueue<>();
+            isOperationPending = false;
+        }
+
+        void scheduleOperation(final BleOperation operation) {
+            this.fifo.add(operation);
+        }
+
+        BleOperation getNextOperation() {
+            if (isOperationPending) {
+                return null;
+            }
+            final BleOperation nextOperation = fifo.poll();
+            isOperationPending = nextOperation != null;
+            return nextOperation;
+        }
+
+        void signalOperationCompleted() {
+            isOperationPending = false;
         }
     }
 }
