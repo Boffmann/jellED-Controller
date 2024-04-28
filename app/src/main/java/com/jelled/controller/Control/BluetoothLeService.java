@@ -9,15 +9,12 @@ import static android.bluetooth.BluetoothGatt.GATT_WRITE_NOT_PERMITTED;
 import static android.bluetooth.BluetoothGattCharacteristic.PROPERTY_WRITE;
 
 import android.app.Service;
-import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
-import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Binder;
@@ -33,12 +30,11 @@ import com.jelled.controller.Control.Operation.BleWriteOperation;
 import com.jelled.controller.Exception.JellEDBluetoothException;
 
 import java.util.Arrays;
-import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class BluetoothLeService extends Service {
 
@@ -61,6 +57,7 @@ public class BluetoothLeService extends Service {
     private final CommandQueue commandQueue = new CommandQueue();
 
     private int connectionState;
+    private ExecutorService executorService;
 
     private final BluetoothGattCallback bluetoothGattCallback = new BluetoothGattCallback() {
         @Override
@@ -141,18 +138,31 @@ public class BluetoothLeService extends Service {
         this.bluetoothDevice = bluetoothDevice;
 
         connect();
+    }
 
-        ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-        executorService.scheduleAtFixedRate(() -> {
-            final BleOperation bleOperation = commandQueue.getNextOperation();
-            if (bleOperation != null) {
+    private void runTaskExecutor() {
+        if (executorService != null && !executorService.isShutdown()) {
+            return;
+        }
+        executorService = Executors.newSingleThreadExecutor();
+        executorService.execute(() -> {
+            while (true) {
                 try {
-                    bleOperation.execute();
-                } catch (JellEDBluetoothException e) {
-                    throw new RuntimeException(e);
+                    final BleOperation bleOperation = commandQueue.getNextOperation();
+                    if (bleOperation != null) {
+                        try {
+                            bleOperation.execute();
+                        } catch (JellEDBluetoothException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                } catch (NoSuchElementException e) {
+                    Log.i(TAG, "Shutting down nothing left to do");
+                    executorService.shutdown();
+                    break;
                 }
             }
-        }, 1, 1, TimeUnit.SECONDS);
+        });
     }
 
     void writePackage(final BluetoothPayload payload) throws SecurityException {
@@ -202,7 +212,7 @@ public class BluetoothLeService extends Service {
         }
     }
 
-    private static class CommandQueue {
+    private class CommandQueue {
         private final ConcurrentLinkedQueue<BleOperation> fifo;
         private boolean isOperationPending;
 
@@ -212,16 +222,17 @@ public class BluetoothLeService extends Service {
         }
 
         void scheduleOperation(final BleOperation operation) {
+            runTaskExecutor();
             this.fifo.add(operation);
         }
 
-        BleOperation getNextOperation() {
+        BleOperation getNextOperation() throws NoSuchElementException {
             if (isOperationPending) {
                 return null;
             }
-            final BleOperation nextOperation = fifo.poll();
-            isOperationPending = nextOperation != null;
-            return nextOperation;
+            final BleOperation operation = fifo.remove();
+            isOperationPending = true;
+            return operation;
         }
 
         void signalOperationCompleted() {
