@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">jelledController</string>
+    <string-array name="patternTypes">
+    </string-array>
 </resources>

@@ -2,7 +2,6 @@ package com.jelled.controller.Discover;
 
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -17,7 +16,6 @@ import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.jelled.controller.Alert.AlertDialogFactory;
-import com.jelled.controller.Control.JellEDControlActivity;
 import com.jelled.controller.R;
 
 import java.util.ArrayList;
@@ -25,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 class BluetoothDeviceListAdapter extends ListAdapter<BluetoothDevice, BluetoothDeviceListAdapter.BluetoothDeviceViewHolder> {
 

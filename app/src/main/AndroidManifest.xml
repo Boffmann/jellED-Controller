@@ -27,6 +27,7 @@
         </activity>
         <activity android:name=".Discover.DeviceScanActivity"></activity>
         <activity android:name=".Control.JellEDControlActivity"></activity>
+        <activity android:name=".Control.ColorPickerActivity"></activity>
         <service
             android:name=".Control.BluetoothLeService">
         </service>
