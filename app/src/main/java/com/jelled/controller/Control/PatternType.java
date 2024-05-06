@@ -6,11 +6,21 @@ public enum PatternType {
 
     private final int id;
 
-    private PatternType(final int id) {
+    PatternType(final int id) {
         this.id = id;
     }
 
     public int getId() {
         return id;
+    }
+
+    public static PatternType fromString(final String typeString) {
+        for (final PatternType type : PatternType.values()) {
+            if (type.name().equalsIgnoreCase(typeString)) {
+                return type;
+            }
+        }
+
+        return null;
     }
 }

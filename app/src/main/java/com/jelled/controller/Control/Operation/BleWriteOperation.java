@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 
+import com.google.gson.Gson;
 import com.jelled.controller.Control.BluetoothPayload;
 import com.jelled.controller.Exception.JellEDBluetoothException;
 
@@ -25,10 +26,13 @@ public class BleWriteOperation extends BleOperation {
 
     @Override
     public void execute() throws JellEDBluetoothException {
+        Gson gson = new Gson();
+        final byte[] payloadJsonBytes = gson.toJson(payload)
+                .getBytes();
         try {
             bluetoothGatt.writeCharacteristic(
                     bluetoothGattCharacteristic,
-                    payload.getAsBytes(),
+                    payloadJsonBytes,
                     BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             );
         } catch (final SecurityException securityException) {

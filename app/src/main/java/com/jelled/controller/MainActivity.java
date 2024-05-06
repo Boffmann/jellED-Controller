@@ -15,7 +15,6 @@ import com.jelled.controller.Discover.DeviceScanActivity;
 
 import java.util.List;
 
-@RequiresApi(api = Build.VERSION_CODES.S)
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "JellEDControlActivity";
@@ -25,8 +24,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-//        Intent scanBluetoothDevicesIntent = new Intent(this, DeviceScanActivity.class);
-        Intent scanBluetoothDevicesIntent = new Intent(this, JellEDControlActivity.class);
+        Intent scanBluetoothDevicesIntent = new Intent(this, DeviceScanActivity.class);
         this.startActivity(scanBluetoothDevicesIntent);
     }
 }
